@@ -1,28 +1,30 @@
+// routes/listings.js
 const express = require("express");
 const router = express.Router();
 const wrapAsync = require("../utils/wrapAsync.js");
 const Listing = require("../models/listing");
 const { isLoggedIn, isOwner, validateListing } = require("../middleware.js");
 const listingController = require("../controllers/listings.js");
-
-const multer = require("multer");
-const storage = require("../cloudConfig.js");
-const upload = multer({ storage });
+const { upload } = require("../config/multer.config.js"); 
+const { uploadOnCloudinary } = require("../config/cloudConfig.js");
 
 router
   .route("/")
   .get(wrapAsync(listingController.index))
-  // .post(
-  //   isLoggedIn,
-  //   upload.single("listing[image]"),
-  //   validateListing,
-  //   wrapAsync(listingController.createListing)
-  // );
-  .post(upload.single("listing[image]"), (req, res) => {
+  .post(upload.single("listing[image]"), async (req, res) => {
     if (!req.file) {
       return res.status(400).send("No file uploaded.");
     }
-    res.send(req.file);
+
+    try {
+      const result = await uploadOnCloudinary(req.file.path);
+      if (!result) {
+        return res.status(500).send("Failed to upload image to Cloudinary.");
+      }
+      res.send({ message: "Image uploaded successfully!", url: result.url });
+    } catch (error) {
+      res.status(500).send("Server error while uploading image.");
+    }
   });
 
 router.get("/new", isLoggedIn, listingController.renderNewForm);
